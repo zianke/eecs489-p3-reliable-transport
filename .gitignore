@@ -34,3 +34,5 @@
 # Misc
 .idea/
 .DS_Store
+cmake-build-debug/
+CMakeLists.txt
