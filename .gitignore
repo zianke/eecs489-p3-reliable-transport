@@ -30,6 +30,8 @@
 *.exe
 *.out
 *.app
+wReceiver
+wSender
 
 # Misc
 .idea/
