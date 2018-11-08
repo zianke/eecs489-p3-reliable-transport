@@ -36,7 +36,7 @@ struct PacketHeader parse_packet_header(char *buffer) {
     return packet_header;
 }
 
-size_t read_nth_chunk(char *chunk, int n, long file_len, FILE *fileptr) {
+size_t fread_nth_chunk(char *chunk, int n, long file_len, FILE *fileptr) {
     size_t max_chunk_len = 4;
     long offset = max_chunk_len * n;
     assert(offset < file_len);
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     rewind(fileptr);
 
 
-    unsigned int chunk_len = read_nth_chunk(chunk, 0, file_len, fileptr);
+    unsigned int chunk_len = fread_nth_chunk(chunk, 0, file_len, fileptr);
 
     struct PacketHeader packet_header = {2, 1, chunk_len, 123};
     size_t buffer_len = assemble_packet(buffer, packet_header, chunk);
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
         printf("[%c]", buffer[i]);
     }
 
-    chunk_len = read_nth_chunk(chunk, 3, file_len, fileptr);
+    chunk_len = fread_nth_chunk(chunk, 3, file_len, fileptr);
 
     packet_header = {2, 1, chunk_len, 123};
     buffer_len = assemble_packet(buffer, packet_header, chunk);
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
         printf("[%c]", buffer[i]);
     }
 
-    chunk_len = read_nth_chunk(chunk, 2, file_len, fileptr);
+    chunk_len = fread_nth_chunk(chunk, 2, file_len, fileptr);
 
     packet_header = {2, 1, chunk_len, 123};
     buffer_len = assemble_packet(buffer, packet_header, chunk);
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
         printf("[%c]", buffer[i]);
     }
 
-    chunk_len = read_nth_chunk(chunk, 4, file_len, fileptr);
+    chunk_len = fread_nth_chunk(chunk, 4, file_len, fileptr);
 
     packet_header = {2, 1, chunk_len, 123};
     buffer_len = assemble_packet(buffer, packet_header, chunk);
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
         printf("[%c]", buffer[i]);
     }
 
-    chunk_len = read_nth_chunk(chunk, 1, file_len, fileptr);
+    chunk_len = fread_nth_chunk(chunk, 1, file_len, fileptr);
 
     packet_header = {2, 1, chunk_len, 123};
     buffer_len = assemble_packet(buffer, packet_header, chunk);
