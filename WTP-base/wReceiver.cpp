@@ -28,22 +28,24 @@ int main(int argc, char *argv[]) {
     int window_size = atoi(argv[3]);
     char *file_dir = argv[4];
 
+    // Init UDP receiver
     int sockfd;
-    struct sockaddr_in my_addr;    // my address information
-    struct sockaddr_in their_addr; // connector's address information
-    int addr_len, numbytes;
-    char buf[MAXBUFLEN];
-    bzero(buf, MAXBUFLEN);
+    struct sockaddr_in my_addr;
+    struct sockaddr_in their_addr;
+    int addr_len = sizeof(struct sockaddr);
+    int numbytes;
+    char buffer[MAXBUFLEN];
+    bzero(buffer, MAXBUFLEN);
 
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
         perror("socket");
         exit(1);
     }
 
-    my_addr.sin_family = AF_INET;         // host byte order
-    my_addr.sin_port = htons(port_num);     // short, network byte order
-    my_addr.sin_addr.s_addr = INADDR_ANY; // automatically fill with my IP
-    memset(&(my_addr.sin_zero), '\0', 8); // zero the rest of the struct
+    my_addr.sin_family = AF_INET;
+    my_addr.sin_port = htons(port_num);
+    my_addr.sin_addr.s_addr = INADDR_ANY;
+    memset(&(my_addr.sin_zero), '\0', 8);
 
     if (bind(sockfd, (struct sockaddr *) &my_addr,
              sizeof(struct sockaddr)) == -1) {
@@ -51,16 +53,17 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    addr_len = sizeof(struct sockaddr);
-    if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN - 1, 0,
-                             (struct sockaddr *) &their_addr, (socklen_t *) &addr_len)) == -1) {
-        perror("recvfrom");
-        exit(1);
-    }
+    while (true) {
+        if ((numbytes = recvfrom(sockfd, buffer, MAXBUFLEN - 1, 0,
+                                 (struct sockaddr *) &their_addr, (socklen_t *) &addr_len)) == -1) {
+            perror("recvfrom");
+            exit(1);
+        }
 
-    printf("got packet from %s\n", inet_ntoa(their_addr.sin_addr));
-    printf("packet is %d bytes long\n", numbytes);
-    printf("packet contains \"%s\"\n", buf);
+        printf("got packet from %s\n", inet_ntoa(their_addr.sin_addr));
+        printf("packet is %d bytes long\n", numbytes);
+        printf("packet contains \"%s\"\n", buffer);
+    }
 
     close(sockfd);
 

@@ -14,6 +14,27 @@
 #include <cassert>
 #include <time.h>
 #include <sys/time.h>
+#include "PacketHeader.h"
+
+#define MAX_PACKET_LEN 1472
+
+size_t assemble_packet(char *buffer, struct PacketHeader packet_header,
+                       char *chunk) {
+    size_t packet_header_len = sizeof(PacketHeader);
+    size_t chunk_len = packet_header.length;
+    assert(packet_header_len + chunk_len <= MAX_PACKET_LEN);
+
+    memcpy(buffer, &packet_header, packet_header_len);
+    memcpy(buffer + packet_header_len, chunk, chunk_len);
+
+    return packet_header_len + chunk_len;
+}
+
+struct PacketHeader parse_packet_header(char *buffer) {
+    struct PacketHeader packet_header;
+    memcpy(&packet_header, buffer, sizeof(PacketHeader));
+    return packet_header;
+}
 
 int main(int argc, char *argv[]) {
     if (argc < 6) {
@@ -27,13 +48,15 @@ int main(int argc, char *argv[]) {
     char *receiver_IP = argv[4];
     int receiver_port = atoi(argv[5]);
 
+    // Init UDP sender
     int sockfd;
-    struct sockaddr_in their_addr; // connector's address information
+    struct sockaddr_in their_addr;
     struct hostent *he;
     int numbytes;
-    char *message = "this is a test message";
+    char buffer[MAX_PACKET_LEN];
+    bzero(buffer, MAX_PACKET_LEN);
 
-    if ((he = gethostbyname(receiver_IP)) == NULL) {  // get the host info
+    if ((he = gethostbyname(receiver_IP)) == NULL) {
         perror("gethostbyname");
         exit(1);
     }
@@ -43,19 +66,47 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    their_addr.sin_family = AF_INET;     // host byte order
-    their_addr.sin_port = htons(receiver_port); // short, network byte order
+    their_addr.sin_family = AF_INET;
+    their_addr.sin_port = htons(receiver_port);
     their_addr.sin_addr = *((struct in_addr *) he->h_addr);
-    memset(&(their_addr.sin_zero), '\0', 8); // zero the rest of the struct
+    memset(&(their_addr.sin_zero), '\0', 8);
 
-    if ((numbytes = sendto(sockfd, message, strlen(message), 0,
-                           (struct sockaddr *) &their_addr, sizeof(struct sockaddr))) == -1) {
-        perror("sendto");
-        exit(1);
+    // Init file pointer
+    FILE *fileptr;
+    long file_len;
+    char chunk[MAX_PACKET_LEN];
+    bzero(chunk, MAX_PACKET_LEN);
+
+    fileptr = fopen(input_file, "rb");
+    fseek(fileptr, 0, SEEK_END);
+    file_len = ftell(fileptr);
+    rewind(fileptr);
+
+    fseek(fileptr, 1, SEEK_CUR);
+    fread(chunk, 4, 1, fileptr);
+    fclose(fileptr);
+
+    struct PacketHeader packet_header = {2, 1, 4, 123};
+    size_t buffer_len = assemble_packet(buffer, packet_header, chunk);
+    printf("%d", buffer_len);
+
+    for (size_t i = 0; i < buffer_len; i++) {
+        printf("[%c]", buffer[i]);
     }
 
-    printf("sent %d bytes to %s\n", numbytes,
-           inet_ntoa(their_addr.sin_addr));
+    struct PacketHeader packet_header2 = parse_packet_header(buffer);
+    printf("%d", packet_header2.type);
+
+//    while (true) {
+//        if ((numbytes = sendto(sockfd, buffer, 4, 0,
+//                               (struct sockaddr *) &their_addr, sizeof(struct sockaddr))) == -1) {
+//            perror("sendto");
+//            exit(1);
+//        }
+//
+//        printf("sent %d bytes to %s\n", numbytes,
+//               inet_ntoa(their_addr.sin_addr));
+//    }
 
     close(sockfd);
 
