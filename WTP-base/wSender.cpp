@@ -20,7 +20,7 @@
 
 size_t assemble_packet(char *buffer, struct PacketHeader packet_header,
                        char *chunk) {
-    size_t packet_header_len = sizeof(PacketHeader);
+    size_t packet_header_len = sizeof(struct PacketHeader);
     size_t chunk_len = packet_header.length;
     assert(packet_header_len + chunk_len <= MAX_PACKET_LEN);
 
@@ -32,8 +32,21 @@ size_t assemble_packet(char *buffer, struct PacketHeader packet_header,
 
 struct PacketHeader parse_packet_header(char *buffer) {
     struct PacketHeader packet_header;
-    memcpy(&packet_header, buffer, sizeof(PacketHeader));
+    memcpy(&packet_header, buffer, sizeof(struct PacketHeader));
     return packet_header;
+}
+
+size_t read_nth_chunk(char *chunk, int n, long file_len, FILE *fileptr) {
+    size_t max_chunk_len = 4;
+    long offset = max_chunk_len * n;
+    assert(offset < file_len);
+
+    size_t chunk_len = file_len - offset < max_chunk_len ? file_len - offset : max_chunk_len;
+    long cur_offset = ftell(fileptr);
+    fseek(fileptr, offset - cur_offset, SEEK_CUR);
+
+    fread(chunk, chunk_len, 1, fileptr);
+    return chunk_len;
 }
 
 int main(int argc, char *argv[]) {
@@ -82,11 +95,10 @@ int main(int argc, char *argv[]) {
     file_len = ftell(fileptr);
     rewind(fileptr);
 
-    fseek(fileptr, 1, SEEK_CUR);
-    fread(chunk, 4, 1, fileptr);
-    fclose(fileptr);
 
-    struct PacketHeader packet_header = {2, 1, 4, 123};
+    unsigned int chunk_len = read_nth_chunk(chunk, 0, file_len, fileptr);
+
+    struct PacketHeader packet_header = {2, 1, chunk_len, 123};
     size_t buffer_len = assemble_packet(buffer, packet_header, chunk);
     printf("%d", buffer_len);
 
@@ -94,8 +106,48 @@ int main(int argc, char *argv[]) {
         printf("[%c]", buffer[i]);
     }
 
-    struct PacketHeader packet_header2 = parse_packet_header(buffer);
-    printf("%d", packet_header2.type);
+    chunk_len = read_nth_chunk(chunk, 3, file_len, fileptr);
+
+    packet_header = {2, 1, chunk_len, 123};
+    buffer_len = assemble_packet(buffer, packet_header, chunk);
+    printf("%d", buffer_len);
+
+    for (size_t i = 0; i < buffer_len; i++) {
+        printf("[%c]", buffer[i]);
+    }
+
+    chunk_len = read_nth_chunk(chunk, 2, file_len, fileptr);
+
+    packet_header = {2, 1, chunk_len, 123};
+    buffer_len = assemble_packet(buffer, packet_header, chunk);
+    printf("%d", buffer_len);
+
+    for (size_t i = 0; i < buffer_len; i++) {
+        printf("[%c]", buffer[i]);
+    }
+
+    chunk_len = read_nth_chunk(chunk, 4, file_len, fileptr);
+
+    packet_header = {2, 1, chunk_len, 123};
+    buffer_len = assemble_packet(buffer, packet_header, chunk);
+    printf("%d", buffer_len);
+
+    for (size_t i = 0; i < buffer_len; i++) {
+        printf("[%c]", buffer[i]);
+    }
+
+    chunk_len = read_nth_chunk(chunk, 1, file_len, fileptr);
+
+    packet_header = {2, 1, chunk_len, 123};
+    buffer_len = assemble_packet(buffer, packet_header, chunk);
+    printf("%d", buffer_len);
+
+    for (size_t i = 0; i < buffer_len; i++) {
+        printf("[%c]", buffer[i]);
+    }
+
+//    struct PacketHeader packet_header2 = parse_packet_header(buffer);
+//    printf("%d", packet_header2.type);
 
 //    while (true) {
 //        if ((numbytes = sendto(sockfd, buffer, 4, 0,
@@ -109,6 +161,7 @@ int main(int argc, char *argv[]) {
 //    }
 
     close(sockfd);
+    fclose(fileptr);
 
     return 0;
 }
