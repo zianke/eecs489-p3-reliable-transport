@@ -87,6 +87,13 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 500000;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+        perror("Error");
+    }
+
     recv_addr.sin_family = AF_INET;
     recv_addr.sin_port = htons(receiver_port);
     recv_addr.sin_addr = *((struct in_addr *) he->h_addr);
@@ -170,8 +177,7 @@ int main(int argc, char *argv[]) {
     packet_len = assemble_packet(buffer, 0, rand_num, 0, chunk);
 
     // Repeat sending START until ACK
-    bool start_ack_received = false;
-    while (!start_ack_received) {
+    while (true) {
         if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
                                (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
             perror("sendto");
@@ -181,31 +187,21 @@ int main(int argc, char *argv[]) {
         printf("sent %d bytes type %d to %s:%d\n", numbytes, 0, inet_ntoa(recv_addr.sin_addr),
                ntohs(recv_addr.sin_port));
 
-        // TODO: Reset timer
-
-        // Waiting for ACK
-        while (true) {
-            // TODO: If time is up, break
-
-            if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
-                                     (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
-                perror("recvfrom");
-                exit(1);
-            }
-
-            char *ACK_ip = inet_ntoa(ACK_addr.sin_addr);
-            int ACK_port = ntohs(ACK_addr.sin_port);
-
-            printf("%s, %d\n", ACK_ip, ACK_port);
-
-            struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-
-            if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
-                start_ack_received = true;
-                break;
-            }
+        if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
+                                 (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
+            continue;
         }
 
+        char *ACK_ip = inet_ntoa(ACK_addr.sin_addr);
+        int ACK_port = ntohs(ACK_addr.sin_port);
+
+        printf("%s, %d\n", ACK_ip, ACK_port);
+
+        struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+
+        if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
+            break;
+        }
     }
 
     close(sockfd);
