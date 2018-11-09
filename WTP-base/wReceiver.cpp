@@ -95,89 +95,120 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    // Init file pointer
-    FILE *fileptr;
-    char chunk[MAX_PACKET_LEN];
-    bzero(chunk, MAX_PACKET_LEN);
-    fileptr = fopen(file_dir, "rb+");
-
-    int rand_num = -1; // END seqNum should be the same as START;
-
-    bool completed = false;
-    while (!completed) {
-        if ((numbytes = recvfrom(sockfd, buffer, MAX_BUFFER_LEN - 1, 0,
-                                 (struct sockaddr *) &send_addr, (socklen_t *) &addr_len)) == -1) {
-            perror("recvfrom");
-            exit(1);
-        }
-
-        char *send_ip = inet_ntoa(send_addr.sin_addr);
-        int send_port = ntohs(send_addr.sin_port);
-
-        printf("%s, %d\n", send_ip, send_port);
-
-        struct PacketHeader packet_header = parse_packet_header(buffer);
+    int file_num = 0;
+    while (true) {
+        // Init filename
+        file_num++;
+        FILE *fileptr = nullptr;
+        char chunk[MAX_PACKET_LEN];
         bzero(chunk, MAX_PACKET_LEN);
-        size_t chunk_len = parse_chunk(buffer, chunk);
-        printf("%d, %d, %d, %d\n", packet_header.type, packet_header.seqNum, packet_header.length,
-               packet_header.checksum);
+        char output_file[strlen(file_dir) + 10];
+        sprintf(output_file, "%s-%d", file_dir, file_num);
 
-        if (crc32(chunk, chunk_len) != packet_header.checksum) {
-            printf("Checksum incorrect\n");
-            continue;
+        int rand_num = -1; // END seqNum should be the same as START;
+
+        bool completed = false;
+        while (!completed) {
+            if ((numbytes = recvfrom(sockfd, buffer, MAX_BUFFER_LEN - 1, 0,
+                                     (struct sockaddr *) &send_addr, (socklen_t *) &addr_len)) == -1) {
+                perror("recvfrom");
+                exit(1);
+            }
+
+            char *send_ip = inet_ntoa(send_addr.sin_addr);
+            int send_port = ntohs(send_addr.sin_port);
+
+            printf("%s, %d\n", send_ip, send_port);
+
+            struct PacketHeader packet_header = parse_packet_header(buffer);
+            bzero(chunk, MAX_PACKET_LEN);
+            size_t chunk_len = parse_chunk(buffer, chunk);
+            printf("%d, %d, %d, %d\n", packet_header.type, packet_header.seqNum, packet_header.length,
+                   packet_header.checksum);
+
+            if (crc32(chunk, chunk_len) != packet_header.checksum) {
+                printf("Checksum incorrect\n");
+                continue;
+            }
+
+            bool should_continue = false;
+            switch (packet_header.type) {
+                case 0:
+                    if (rand_num != -1) {
+                        printf("Duplicate START\n");
+                        should_continue = true;
+                    } else {
+                        rand_num = packet_header.seqNum;
+                        if (fileptr == nullptr) {
+                            fileptr = fopen(output_file, "wb+");
+                            fclose(fileptr);
+                            fileptr = fopen(output_file, "rb+");
+                        }
+                    }
+                    break;
+                case 1:
+                    if (rand_num != packet_header.seqNum) {
+                        printf("END seqNum not same as START\n");
+                        should_continue = true;
+                    } else {
+                        completed = true;
+                        rand_num = -1;
+                    }
+                    break;
+                case 2:
+                    if (rand_num == -1) {
+                        printf("No START received\n");
+                        should_continue = true;
+                    } else {
+
+
+                    }
+                    break;
+                default:
+                    should_continue = true;
+                    break;
+            }
+
+            if (should_continue) {
+                continue;
+            }
+
+            // Init ACK sender
+            struct sockaddr_in ACK_addr;
+            struct hostent *he;
+
+            if ((he = gethostbyname(send_ip)) == NULL) {
+                perror("gethostbyname");
+                exit(1);
+            }
+
+            ACK_addr.sin_family = AF_INET;
+            ACK_addr.sin_port = htons(send_port);
+            ACK_addr.sin_addr = *((struct in_addr *) he->h_addr);
+            memset(&(ACK_addr.sin_zero), '\0', 8);
+
+            char ACK_buffer[MAX_BUFFER_LEN];
+            bzero(ACK_buffer, MAX_BUFFER_LEN);
+
+            char empty_chunk[1];
+            bzero(ACK_buffer, 1);
+
+            size_t ACK_packet_len = assemble_packet(ACK_buffer, 3, packet_header.seqNum, 0, empty_chunk);
+
+            if ((numbytes = sendto(sockfd, ACK_buffer, ACK_packet_len, 0,
+                                   (struct sockaddr *) &ACK_addr, sizeof(struct sockaddr))) == -1) {
+                perror("sendto");
+                exit(1);
+            }
+
+            printf("sent %d bytes type %d to %s:%d\n", numbytes, 3, inet_ntoa(ACK_addr.sin_addr),
+                   ntohs(ACK_addr.sin_port));
         }
 
-        if (packet_header.type == 0 && rand_num != -1) {
-            printf("Duplicate START\n");
-            continue;
-        }
-
-        // Init ACK sender
-        struct sockaddr_in ACK_addr;
-        struct hostent *he;
-
-        if ((he = gethostbyname(send_ip)) == NULL) {
-            perror("gethostbyname");
-            exit(1);
-        }
-
-        ACK_addr.sin_family = AF_INET;
-        ACK_addr.sin_port = htons(send_port);
-        ACK_addr.sin_addr = *((struct in_addr *) he->h_addr);
-        memset(&(ACK_addr.sin_zero), '\0', 8);
-
-        char ACK_buffer[MAX_BUFFER_LEN];
-        bzero(ACK_buffer, MAX_BUFFER_LEN);
-
-        char empty_chunk[1];
-        bzero(ACK_buffer, 1);
-
-        size_t ACK_packet_len = assemble_packet(ACK_buffer, 3, packet_header.seqNum, 0, empty_chunk);
-
-        if ((numbytes = sendto(sockfd, ACK_buffer, ACK_packet_len, 0,
-                               (struct sockaddr *) &ACK_addr, sizeof(struct sockaddr))) == -1) {
-            perror("sendto");
-            exit(1);
-        }
-
-        printf("sent %d bytes type %d to %s:%d\n", numbytes, 3, inet_ntoa(ACK_addr.sin_addr), ntohs(ACK_addr.sin_port));
-
-        switch (packet_header.type) {
-            case 0:
-                rand_num = packet_header.seqNum;
-                break;
-            case 1:
-                if (packet_header.seqNum == rand_num) {
-                    completed = true;
-                }
-                break;
-            case 2:
-                break;
-        }
+        fclose(fileptr);
     }
 
     close(sockfd);
-    fclose(fileptr);
 
     return 0;
 }
