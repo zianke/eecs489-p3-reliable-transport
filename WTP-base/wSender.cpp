@@ -163,7 +163,6 @@ int main(int argc, char *argv[]) {
     }
 
     int window_start = 0;
-    bool all_acked = false;
     bool resend_all = false;
     while (window_start != num_chunks) {
         for (int i = window_start; i < min(window_start + window_size, num_chunks); i++) {
