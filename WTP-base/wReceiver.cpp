@@ -82,6 +82,9 @@ int main(int argc, char *argv[]) {
     int window_size = atoi(argv[3]);
     char *file_dir = argv[4];
 
+    // Init log file pointer
+    FILE *log_fileptr = fopen(log, "a+");
+
     // Init UDP receiver
     int sockfd;
     struct sockaddr_in recv_addr;
@@ -140,8 +143,9 @@ int main(int argc, char *argv[]) {
             int send_port = ntohs(send_addr.sin_port);
 
             struct PacketHeader packet_header = parse_packet_header(buffer);
-            printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
+            fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
                    packet_header.checksum);
+            fflush(log_fileptr);
 
             bzero(chunk, MAX_PACKET_LEN);
             size_t chunk_len = parse_chunk(buffer, chunk);
@@ -253,14 +257,16 @@ int main(int argc, char *argv[]) {
             }
 
             struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-            printf("%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+            fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
                    ack_packet_header.checksum);
+            fflush(log_fileptr);
         }
 
         fclose(fileptr);
     }
 
     close(sockfd);
+    fclose(log_fileptr);
 
     return 0;
 }

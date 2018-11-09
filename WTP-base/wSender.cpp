@@ -70,6 +70,9 @@ int main(int argc, char *argv[]) {
     char *receiver_IP = argv[4];
     int receiver_port = atoi(argv[5]);
 
+    // Init log file pointer
+    FILE *log_fileptr = fopen(log, "a+");
+
     // Init UDP sender
     int sockfd;
     struct sockaddr_in recv_addr;
@@ -115,64 +118,6 @@ int main(int argc, char *argv[]) {
     file_len = ftell(fileptr);
     rewind(fileptr);
 
-//
-//    unsigned int chunk_len = fread_nth_chunk(chunk, 0, file_len, fileptr);
-//
-//    struct PacketHeader packet_header = {2, 1, chunk_len, 123};
-//    size_t buffer_len = assemble_packet(buffer, packet_header, chunk);
-//    printf("%d", buffer_len);
-//
-//    for (size_t i = 0; i < buffer_len; i++) {
-//        printf("[%c]", buffer[i]);
-//    }
-//
-//    chunk_len = fread_nth_chunk(chunk, 3, file_len, fileptr);
-//
-//    packet_header = {2, 1, chunk_len, 123};
-//    buffer_len = assemble_packet(buffer, packet_header, chunk);
-//    printf("%d", buffer_len);
-//
-//    for (size_t i = 0; i < buffer_len; i++) {
-//        printf("[%c]", buffer[i]);
-//    }
-//
-//    chunk_len = fread_nth_chunk(chunk, 2, file_len, fileptr);
-//
-//    packet_header = {2, 1, chunk_len, 123};
-//    buffer_len = assemble_packet(buffer, packet_header, chunk);
-//    printf("%d", buffer_len);
-//
-//    for (size_t i = 0; i < buffer_len; i++) {
-//        printf("[%c]", buffer[i]);
-//    }
-//
-//    chunk_len = fread_nth_chunk(chunk, 4, file_len, fileptr);
-//
-//    packet_header = {2, 1, chunk_len, 123};
-//    buffer_len = assemble_packet(buffer, packet_header, chunk);
-//    printf("%d", buffer_len);
-//
-//    for (size_t i = 0; i < buffer_len; i++) {
-//        printf("[%c]", buffer[i]);
-//    }
-//
-//    chunk_len = fread_nth_chunk(chunk, 1, file_len, fileptr);
-//
-//    packet_header = {2, 1, chunk_len, 123};
-//    buffer_len = assemble_packet(buffer, packet_header, chunk);
-//    printf("%d", buffer_len);
-//
-//    for (size_t i = 0; i < buffer_len; i++) {
-//        printf("[%c]", buffer[i]);
-//    }
-
-//    struct PacketHeader packet_header2 = parse_packet_header(buffer);
-//    printf("%d", packet_header2.type);
-
-    unsigned int type;
-    unsigned int seqNum;
-    unsigned int length;
-    unsigned int checksum;
     size_t packet_len;
     size_t chunk_len;
 
@@ -191,8 +136,9 @@ int main(int argc, char *argv[]) {
         }
 
         struct PacketHeader packet_header = parse_packet_header(buffer);
-        printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
+        fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
                packet_header.checksum);
+        fflush(log_fileptr);
 
         if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
                                  (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
@@ -200,8 +146,9 @@ int main(int argc, char *argv[]) {
         }
 
         struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-        printf("%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
                ack_packet_header.checksum);
+        fflush(log_fileptr);
 
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
             break;
@@ -231,8 +178,9 @@ int main(int argc, char *argv[]) {
                 status[i] = 0;
 
                 struct PacketHeader packet_header = parse_packet_header(buffer);
-                printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
+                fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
                        packet_header.checksum);
+                fflush(log_fileptr);
             }
         }
 
@@ -245,8 +193,9 @@ int main(int argc, char *argv[]) {
         resend_all = false;
 
         struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-        printf("%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
                ack_packet_header.checksum);
+        fflush(log_fileptr);
 
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum > window_start) {
             window_start = ack_packet_header.seqNum;
@@ -267,8 +216,9 @@ int main(int argc, char *argv[]) {
         }
 
         struct PacketHeader packet_header = parse_packet_header(buffer);
-        printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
+        fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
                packet_header.checksum);
+        fflush(log_fileptr);
 
         if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
                                  (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
@@ -276,8 +226,9 @@ int main(int argc, char *argv[]) {
         }
 
         struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-        printf("%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
                ack_packet_header.checksum);
+        fflush(log_fileptr);
 
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
             break;
@@ -286,6 +237,7 @@ int main(int argc, char *argv[]) {
 
     close(sockfd);
     fclose(fileptr);
+    fclose(log_fileptr);
 
     return 0;
 }
