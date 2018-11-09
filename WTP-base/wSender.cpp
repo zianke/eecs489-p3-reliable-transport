@@ -164,13 +164,14 @@ int main(int argc, char *argv[]) {
     struct PacketHeader packet_header;
     size_t packet_len;
 
-    // Repeat sending START until ACK
     srand(time(NULL));
     unsigned int rand_num = rand();
     bzero(buffer, MAX_PACKET_LEN);
     packet_len = assemble_packet(buffer, 0, rand_num, 0, chunk);
 
-    while (true) {
+    // Repeat sending START until ACK
+    bool start_ack_received = false;
+    while (!start_ack_received) {
         if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
                                (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
             perror("sendto");
@@ -180,7 +181,12 @@ int main(int argc, char *argv[]) {
         printf("sent %d bytes type %d to %s:%d\n", numbytes, 0, inet_ntoa(recv_addr.sin_addr),
                ntohs(recv_addr.sin_port));
 
+        // TODO: Reset timer
+
+        // Waiting for ACK
         while (true) {
+            // TODO: If time is up, break
+
             if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
                                      (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
                 perror("recvfrom");
@@ -193,8 +199,11 @@ int main(int argc, char *argv[]) {
             printf("%s, %d\n", ACK_ip, ACK_port);
 
             struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-            printf("%d, %d, %d, %d\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
-                   ack_packet_header.checksum);
+
+            if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
+                start_ack_received = true;
+                break;
+            }
         }
 
     }
