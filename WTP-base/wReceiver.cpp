@@ -16,6 +16,7 @@
 #include <cassert>
 #include <time.h>
 #include <sys/time.h>
+#include <math.h>
 #include "PacketHeader.h"
 #include "crc32.h"
 
@@ -45,6 +46,17 @@ size_t parse_chunk(char *buffer, char *chunk) {
     size_t packet_len = packet_header.length;
     memcpy(chunk, buffer + sizeof(struct PacketHeader), packet_len);
     return packet_len;
+}
+
+size_t fwrite_nth_chunk(char *chunk, int n, size_t chunk_len, FILE *fileptr) {
+    size_t max_chunk_len = MAX_PACKET_LEN - sizeof(struct PacketHeader);
+    long offset = max_chunk_len * n;
+
+    long cur_offset = ftell(fileptr);
+    fseek(fileptr, offset - cur_offset, SEEK_CUR);
+
+    fwrite(chunk, chunk_len, 1, fileptr);
+    return chunk_len;
 }
 
 int main(int argc, char *argv[]) {
@@ -83,10 +95,16 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    // Init file pointer
+    FILE *fileptr;
     char chunk[MAX_PACKET_LEN];
     bzero(chunk, MAX_PACKET_LEN);
+    fileptr = fopen(file_dir, "rb+");
 
-    while (true) {
+    int rand_num = -1; // END seqNum should be the same as START;
+
+    bool completed = false;
+    while (!completed) {
         if ((numbytes = recvfrom(sockfd, buffer, MAX_BUFFER_LEN - 1, 0,
                                  (struct sockaddr *) &send_addr, (socklen_t *) &addr_len)) == -1) {
             perror("recvfrom");
@@ -109,6 +127,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        // Init ACK sender
         struct sockaddr_in ACK_addr;
         struct hostent *he;
 
@@ -137,9 +156,23 @@ int main(int argc, char *argv[]) {
         }
 
         printf("sent %d bytes type %d to %s:%d\n", numbytes, 3, inet_ntoa(ACK_addr.sin_addr), ntohs(ACK_addr.sin_port));
+
+        switch (packet_header.type) {
+            case 0:
+                rand_num = packet_header.seqNum;
+                break;
+            case 1:
+                if (packet_header.seqNum == rand_num) {
+                    completed = true;
+                }
+                break;
+            case 2:
+                break;
+        }
     }
 
     close(sockfd);
+    fclose(fileptr);
 
     return 0;
 }

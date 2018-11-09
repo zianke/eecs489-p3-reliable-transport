@@ -38,3 +38,5 @@ wSender
 .DS_Store
 cmake-build-debug/
 CMakeLists.txt
+input.txt
+output.txt

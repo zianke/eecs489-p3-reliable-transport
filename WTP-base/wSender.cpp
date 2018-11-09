@@ -16,6 +16,7 @@
 #include <cassert>
 #include <time.h>
 #include <sys/time.h>
+#include <math.h>
 #include "PacketHeader.h"
 #include "crc32.h"
 
@@ -41,7 +42,7 @@ struct PacketHeader parse_packet_header(char *buffer) {
 }
 
 size_t fread_nth_chunk(char *chunk, int n, long file_len, FILE *fileptr) {
-    size_t max_chunk_len = 4;
+    size_t max_chunk_len = MAX_PACKET_LEN - sizeof(struct PacketHeader);
     long offset = max_chunk_len * n;
     assert(offset < file_len);
 
@@ -204,6 +205,10 @@ int main(int argc, char *argv[]) {
             break;
         }
     }
+
+    // Sending chunks
+    int num_chunks = (int) ceil((double) file_len / (double) (MAX_PACKET_LEN - sizeof(struct PacketHeader)));
+    printf("%d\n", num_chunks);
 
 
     // Repeat sending CLOSE until ACK
