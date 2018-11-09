@@ -54,6 +54,10 @@ size_t fread_nth_chunk(char *chunk, int n, long file_len, FILE *fileptr) {
     return chunk_len;
 }
 
+int min(int a, int b) {
+    return a < b ? a : b;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 6) {
         std::cout << "Error: Usage is ./wSender <input_file> <window_size> <log> <receiver_IP> <receiver_port>\n";
@@ -171,6 +175,7 @@ int main(int argc, char *argv[]) {
     unsigned int checksum;
     struct PacketHeader packet_header;
     size_t packet_len;
+    size_t chunk_len;
 
     // Repeat sending START until ACK
     srand(time(NULL));
@@ -209,6 +214,38 @@ int main(int argc, char *argv[]) {
     // Sending chunks
     int num_chunks = (int) ceil((double) file_len / (double) (MAX_PACKET_LEN - sizeof(struct PacketHeader)));
     printf("%d\n", num_chunks);
+    int status[num_chunks]; // -1: not sent, 0: sent not acked, 1: acked
+    for (int i = 0; i < num_chunks; i++) {
+        status[i] = -1;
+    }
+
+    int window_start = 0;
+    bool all_acked = false;
+    bool resend_all = false;
+    while (!all_acked) {
+        for (int i = window_start; i < min(window_start + window_size, num_chunks); i++) {
+            if (status[i] == -1 || (resend_all && status[i] == 0)) {
+                chunk_len = fread_nth_chunk(chunk, i, file_len, fileptr);
+                packet_len = assemble_packet(buffer, 2, i, chunk_len, chunk);
+                if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
+                                       (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
+                    perror("sendto");
+                    exit(1);
+                }
+                status[i] = 0;
+
+                printf("sent %d bytes type %d to %s:%d\n", numbytes, 0, inet_ntoa(recv_addr.sin_addr),
+                       ntohs(recv_addr.sin_port));
+            }
+        }
+
+        all_acked = true;
+        for (int i = 0; i < num_chunks; i++) {
+            if (status[i] != 1) {
+                all_acked = false;
+            }
+        }
+    }
 
 
     // Repeat sending CLOSE until ACK
