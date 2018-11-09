@@ -118,12 +118,13 @@ int main(int argc, char *argv[]) {
             char *send_ip = inet_ntoa(send_addr.sin_addr);
             int send_port = ntohs(send_addr.sin_port);
 
-            printf("%s, %d\n", send_ip, send_port);
-
             struct PacketHeader packet_header = parse_packet_header(buffer);
+            printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
+                   packet_header.checksum);
+
             bzero(chunk, MAX_PACKET_LEN);
             size_t chunk_len = parse_chunk(buffer, chunk);
-            printf("%d, %d, %d, %d\n", packet_header.type, packet_header.seqNum, packet_header.length,
+            printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
                    packet_header.checksum);
 
             if (crc32(chunk, chunk_len) != packet_header.checksum) {
@@ -131,6 +132,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
+            int seqNum = -1;
             bool should_continue = false;
             switch (packet_header.type) {
                 case 0:
@@ -139,6 +141,7 @@ int main(int argc, char *argv[]) {
                         should_continue = true;
                     } else {
                         rand_num = packet_header.seqNum;
+                        seqNum = packet_header.seqNum;
                         if (fileptr == nullptr) {
                             fileptr = fopen(output_file, "wb+");
                             fclose(fileptr);
@@ -147,10 +150,11 @@ int main(int argc, char *argv[]) {
                     }
                     break;
                 case 1:
-                    if (rand_num != packet_header.seqNum) {
+                    if (rand_num != packet_header.seqNum && rand_num != -1) {
                         printf("END seqNum not same as START\n");
                         should_continue = true;
                     } else {
+                        seqNum = packet_header.seqNum;
                         completed = true;
                         rand_num = -1;
                     }
@@ -160,8 +164,9 @@ int main(int argc, char *argv[]) {
                         printf("No START received\n");
                         should_continue = true;
                     } else {
-
-
+                        size_t chunk_len = parse_chunk(buffer, chunk);
+                        fwrite_nth_chunk(chunk, packet_header.seqNum, chunk_len, fileptr);
+                        seqNum = 3;
                     }
                     break;
                 default:
@@ -193,7 +198,8 @@ int main(int argc, char *argv[]) {
             char empty_chunk[1];
             bzero(ACK_buffer, 1);
 
-            size_t ACK_packet_len = assemble_packet(ACK_buffer, 3, packet_header.seqNum, 0, empty_chunk);
+            assert(seqNum >= 0);
+            size_t ACK_packet_len = assemble_packet(ACK_buffer, 3, seqNum, 0, empty_chunk);
 
             if ((numbytes = sendto(sockfd, ACK_buffer, ACK_packet_len, 0,
                                    (struct sockaddr *) &ACK_addr, sizeof(struct sockaddr))) == -1) {
@@ -201,8 +207,9 @@ int main(int argc, char *argv[]) {
                 exit(1);
             }
 
-            printf("sent %d bytes type %d to %s:%d\n", numbytes, 3, inet_ntoa(ACK_addr.sin_addr),
-                   ntohs(ACK_addr.sin_port));
+            struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+            printf("%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+                   ack_packet_header.checksum);
         }
 
         fclose(fileptr);

@@ -173,7 +173,6 @@ int main(int argc, char *argv[]) {
     unsigned int seqNum;
     unsigned int length;
     unsigned int checksum;
-    struct PacketHeader packet_header;
     size_t packet_len;
     size_t chunk_len;
 
@@ -191,20 +190,18 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
-        printf("sent %d bytes type %d to %s:%d\n", numbytes, 0, inet_ntoa(recv_addr.sin_addr),
-               ntohs(recv_addr.sin_port));
+        struct PacketHeader packet_header = parse_packet_header(buffer);
+        printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
+               packet_header.checksum);
 
         if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
                                  (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
             continue;
         }
 
-        char *ACK_ip = inet_ntoa(ACK_addr.sin_addr);
-        int ACK_port = ntohs(ACK_addr.sin_port);
-
-        printf("%s, %d\n", ACK_ip, ACK_port);
-
         struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+        printf("%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+               ack_packet_header.checksum);
 
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
             break;
@@ -213,7 +210,6 @@ int main(int argc, char *argv[]) {
 
     // Sending chunks
     int num_chunks = (int) ceil((double) file_len / (double) (MAX_PACKET_LEN - sizeof(struct PacketHeader)));
-    printf("%d\n", num_chunks);
     int status[num_chunks]; // -1: not sent, 0: sent not acked, 1: acked
     for (int i = 0; i < num_chunks; i++) {
         status[i] = -1;
@@ -222,7 +218,7 @@ int main(int argc, char *argv[]) {
     int window_start = 0;
     bool all_acked = false;
     bool resend_all = false;
-    while (!all_acked) {
+    while (window_start != num_chunks) {
         for (int i = window_start; i < min(window_start + window_size, num_chunks); i++) {
             if (status[i] == -1 || (resend_all && status[i] == 0)) {
                 chunk_len = fread_nth_chunk(chunk, i, file_len, fileptr);
@@ -234,16 +230,26 @@ int main(int argc, char *argv[]) {
                 }
                 status[i] = 0;
 
-                printf("sent %d bytes type %d to %s:%d\n", numbytes, 0, inet_ntoa(recv_addr.sin_addr),
-                       ntohs(recv_addr.sin_port));
+                struct PacketHeader packet_header = parse_packet_header(buffer);
+                printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
+                       packet_header.checksum);
             }
         }
 
-        all_acked = true;
-        for (int i = 0; i < num_chunks; i++) {
-            if (status[i] != 1) {
-                all_acked = false;
-            }
+        if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
+                                 (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
+            resend_all = true;
+            continue;
+        }
+
+        resend_all = false;
+
+        struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+        printf("%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+               ack_packet_header.checksum);
+
+        if (ack_packet_header.type == 3 && ack_packet_header.seqNum > window_start) {
+            window_start = ack_packet_header.seqNum;
         }
     }
 
@@ -260,20 +266,18 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
-        printf("sent %d bytes type %d to %s:%d\n", numbytes, 0, inet_ntoa(recv_addr.sin_addr),
-               ntohs(recv_addr.sin_port));
+        struct PacketHeader packet_header = parse_packet_header(buffer);
+        printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
+               packet_header.checksum);
 
         if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
                                  (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
             continue;
         }
 
-        char *ACK_ip = inet_ntoa(ACK_addr.sin_addr);
-        int ACK_port = ntohs(ACK_addr.sin_port);
-
-        printf("%s, %d\n", ACK_ip, ACK_port);
-
         struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+        printf("%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+               ack_packet_header.checksum);
 
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
             break;
