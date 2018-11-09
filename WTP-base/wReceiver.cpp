@@ -123,7 +123,12 @@ int main(int argc, char *argv[]) {
                packet_header.checksum);
 
         if (crc32(chunk, chunk_len) != packet_header.checksum) {
-            printf("checksum incorrect\n");
+            printf("Checksum incorrect\n");
+            continue;
+        }
+
+        if (packet_header.type == 0 && rand_num != -1) {
+            printf("Duplicate START\n");
             continue;
         }
 
