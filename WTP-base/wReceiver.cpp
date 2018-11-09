@@ -117,11 +117,6 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
-        if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-            perror("socket");
-            exit(1);
-        }
-
         ACK_addr.sin_family = AF_INET;
         ACK_addr.sin_port = htons(send_port);
         ACK_addr.sin_addr = *((struct in_addr *) he->h_addr);

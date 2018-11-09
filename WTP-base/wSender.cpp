@@ -171,12 +171,46 @@ int main(int argc, char *argv[]) {
     struct PacketHeader packet_header;
     size_t packet_len;
 
+    // Repeat sending START until ACK
     srand(time(NULL));
     unsigned int rand_num = rand();
     bzero(buffer, MAX_PACKET_LEN);
+    bzero(chunk, MAX_PACKET_LEN);
     packet_len = assemble_packet(buffer, 0, rand_num, 0, chunk);
 
-    // Repeat sending START until ACK
+    while (true) {
+        if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
+                               (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
+            perror("sendto");
+            exit(1);
+        }
+
+        printf("sent %d bytes type %d to %s:%d\n", numbytes, 0, inet_ntoa(recv_addr.sin_addr),
+               ntohs(recv_addr.sin_port));
+
+        if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
+                                 (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
+            continue;
+        }
+
+        char *ACK_ip = inet_ntoa(ACK_addr.sin_addr);
+        int ACK_port = ntohs(ACK_addr.sin_port);
+
+        printf("%s, %d\n", ACK_ip, ACK_port);
+
+        struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+
+        if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
+            break;
+        }
+    }
+
+
+    // Repeat sending CLOSE until ACK
+    bzero(buffer, MAX_PACKET_LEN);
+    bzero(chunk, MAX_PACKET_LEN);
+    packet_len = assemble_packet(buffer, 1, rand_num, 0, chunk);
+
     while (true) {
         if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
                                (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
