@@ -3,6 +3,8 @@
 #include <string>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -15,19 +17,21 @@
 #include <time.h>
 #include <sys/time.h>
 #include "PacketHeader.h"
+#include "crc32.h"
 
 #define MAX_PACKET_LEN 1472
+#define MAX_BUFFER_LEN 2048
 
-size_t assemble_packet(char *buffer, struct PacketHeader packet_header,
-                       char *chunk) {
+size_t assemble_packet(char *buffer, unsigned int type, unsigned int seqNum, unsigned int length, char *chunk) {
     size_t packet_header_len = sizeof(struct PacketHeader);
-    size_t chunk_len = packet_header.length;
-    assert(packet_header_len + chunk_len <= MAX_PACKET_LEN);
+    assert(packet_header_len + length <= MAX_PACKET_LEN);
+
+    struct PacketHeader packet_header = {type, seqNum, length, crc32(chunk, length)};
 
     memcpy(buffer, &packet_header, packet_header_len);
-    memcpy(buffer + packet_header_len, chunk, chunk_len);
+    memcpy(buffer + packet_header_len, chunk, length);
 
-    return packet_header_len + chunk_len;
+    return packet_header_len + length;
 }
 
 struct PacketHeader parse_packet_header(char *buffer) {
@@ -63,11 +67,15 @@ int main(int argc, char *argv[]) {
 
     // Init UDP sender
     int sockfd;
-    struct sockaddr_in their_addr;
+    struct sockaddr_in recv_addr;
+    struct sockaddr_in ACK_addr;
+    int addr_len = sizeof(struct sockaddr);
     struct hostent *he;
     int numbytes;
     char buffer[MAX_PACKET_LEN];
     bzero(buffer, MAX_PACKET_LEN);
+    char ACK_buffer[MAX_PACKET_LEN];
+    bzero(ACK_buffer, MAX_PACKET_LEN);
 
     if ((he = gethostbyname(receiver_IP)) == NULL) {
         perror("gethostbyname");
@@ -79,10 +87,10 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    their_addr.sin_family = AF_INET;
-    their_addr.sin_port = htons(receiver_port);
-    their_addr.sin_addr = *((struct in_addr *) he->h_addr);
-    memset(&(their_addr.sin_zero), '\0', 8);
+    recv_addr.sin_family = AF_INET;
+    recv_addr.sin_port = htons(receiver_port);
+    recv_addr.sin_addr = *((struct in_addr *) he->h_addr);
+    memset(&(recv_addr.sin_zero), '\0', 8);
 
     // Init file pointer
     FILE *fileptr;
@@ -95,70 +103,101 @@ int main(int argc, char *argv[]) {
     file_len = ftell(fileptr);
     rewind(fileptr);
 
-
-    unsigned int chunk_len = fread_nth_chunk(chunk, 0, file_len, fileptr);
-
-    struct PacketHeader packet_header = {2, 1, chunk_len, 123};
-    size_t buffer_len = assemble_packet(buffer, packet_header, chunk);
-    printf("%d", buffer_len);
-
-    for (size_t i = 0; i < buffer_len; i++) {
-        printf("[%c]", buffer[i]);
-    }
-
-    chunk_len = fread_nth_chunk(chunk, 3, file_len, fileptr);
-
-    packet_header = {2, 1, chunk_len, 123};
-    buffer_len = assemble_packet(buffer, packet_header, chunk);
-    printf("%d", buffer_len);
-
-    for (size_t i = 0; i < buffer_len; i++) {
-        printf("[%c]", buffer[i]);
-    }
-
-    chunk_len = fread_nth_chunk(chunk, 2, file_len, fileptr);
-
-    packet_header = {2, 1, chunk_len, 123};
-    buffer_len = assemble_packet(buffer, packet_header, chunk);
-    printf("%d", buffer_len);
-
-    for (size_t i = 0; i < buffer_len; i++) {
-        printf("[%c]", buffer[i]);
-    }
-
-    chunk_len = fread_nth_chunk(chunk, 4, file_len, fileptr);
-
-    packet_header = {2, 1, chunk_len, 123};
-    buffer_len = assemble_packet(buffer, packet_header, chunk);
-    printf("%d", buffer_len);
-
-    for (size_t i = 0; i < buffer_len; i++) {
-        printf("[%c]", buffer[i]);
-    }
-
-    chunk_len = fread_nth_chunk(chunk, 1, file_len, fileptr);
-
-    packet_header = {2, 1, chunk_len, 123};
-    buffer_len = assemble_packet(buffer, packet_header, chunk);
-    printf("%d", buffer_len);
-
-    for (size_t i = 0; i < buffer_len; i++) {
-        printf("[%c]", buffer[i]);
-    }
+//
+//    unsigned int chunk_len = fread_nth_chunk(chunk, 0, file_len, fileptr);
+//
+//    struct PacketHeader packet_header = {2, 1, chunk_len, 123};
+//    size_t buffer_len = assemble_packet(buffer, packet_header, chunk);
+//    printf("%d", buffer_len);
+//
+//    for (size_t i = 0; i < buffer_len; i++) {
+//        printf("[%c]", buffer[i]);
+//    }
+//
+//    chunk_len = fread_nth_chunk(chunk, 3, file_len, fileptr);
+//
+//    packet_header = {2, 1, chunk_len, 123};
+//    buffer_len = assemble_packet(buffer, packet_header, chunk);
+//    printf("%d", buffer_len);
+//
+//    for (size_t i = 0; i < buffer_len; i++) {
+//        printf("[%c]", buffer[i]);
+//    }
+//
+//    chunk_len = fread_nth_chunk(chunk, 2, file_len, fileptr);
+//
+//    packet_header = {2, 1, chunk_len, 123};
+//    buffer_len = assemble_packet(buffer, packet_header, chunk);
+//    printf("%d", buffer_len);
+//
+//    for (size_t i = 0; i < buffer_len; i++) {
+//        printf("[%c]", buffer[i]);
+//    }
+//
+//    chunk_len = fread_nth_chunk(chunk, 4, file_len, fileptr);
+//
+//    packet_header = {2, 1, chunk_len, 123};
+//    buffer_len = assemble_packet(buffer, packet_header, chunk);
+//    printf("%d", buffer_len);
+//
+//    for (size_t i = 0; i < buffer_len; i++) {
+//        printf("[%c]", buffer[i]);
+//    }
+//
+//    chunk_len = fread_nth_chunk(chunk, 1, file_len, fileptr);
+//
+//    packet_header = {2, 1, chunk_len, 123};
+//    buffer_len = assemble_packet(buffer, packet_header, chunk);
+//    printf("%d", buffer_len);
+//
+//    for (size_t i = 0; i < buffer_len; i++) {
+//        printf("[%c]", buffer[i]);
+//    }
 
 //    struct PacketHeader packet_header2 = parse_packet_header(buffer);
 //    printf("%d", packet_header2.type);
 
-//    while (true) {
-//        if ((numbytes = sendto(sockfd, buffer, 4, 0,
-//                               (struct sockaddr *) &their_addr, sizeof(struct sockaddr))) == -1) {
-//            perror("sendto");
-//            exit(1);
-//        }
-//
-//        printf("sent %d bytes to %s\n", numbytes,
-//               inet_ntoa(their_addr.sin_addr));
-//    }
+    unsigned int type;
+    unsigned int seqNum;
+    unsigned int length;
+    unsigned int checksum;
+    struct PacketHeader packet_header;
+    size_t packet_len;
+
+    // Repeat sending START until ACK
+    srand(time(NULL));
+    unsigned int rand_num = rand();
+    bzero(buffer, MAX_PACKET_LEN);
+    packet_len = assemble_packet(buffer, 0, rand_num, 0, chunk);
+
+    while (true) {
+        if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
+                               (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
+            perror("sendto");
+            exit(1);
+        }
+
+        printf("sent %d bytes type %d to %s:%d\n", numbytes, 0, inet_ntoa(recv_addr.sin_addr),
+               ntohs(recv_addr.sin_port));
+
+        while (true) {
+            if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
+                                     (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
+                perror("recvfrom");
+                exit(1);
+            }
+
+            char *ACK_ip = inet_ntoa(ACK_addr.sin_addr);
+            int ACK_port = ntohs(ACK_addr.sin_port);
+
+            printf("%s, %d\n", ACK_ip, ACK_port);
+
+            struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+            printf("%d, %d, %d, %d\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
+                   ack_packet_header.checksum);
+        }
+
+    }
 
     close(sockfd);
     fclose(fileptr);
