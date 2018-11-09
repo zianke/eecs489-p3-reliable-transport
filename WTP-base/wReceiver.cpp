@@ -59,6 +59,18 @@ size_t fwrite_nth_chunk(char *chunk, int n, size_t chunk_len, FILE *fileptr) {
     return chunk_len;
 }
 
+void left_shift_array(int *array, int num_elements, int shift_by) {
+    assert(num_elements > 0);
+    assert(shift_by > 0);
+    assert(shift_by <= num_elements);
+
+    memmove(&array[0], &array[shift_by], (num_elements - shift_by) * sizeof(int));
+
+    for (int i = num_elements - shift_by; i < num_elements; i++) {
+        array[i] = 0;
+    }
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 5) {
         std::cout << "Error: Usage is ./wReceiver <port_num> <log> <window_size> <file_dir>\n";
@@ -96,6 +108,9 @@ int main(int argc, char *argv[]) {
     }
 
     int file_num = 0;
+    int window_start = 0;
+    int status[window_size]; // 0: not received, 1: received and acked
+
     while (true) {
         // Init filename
         file_num++;
@@ -106,6 +121,12 @@ int main(int argc, char *argv[]) {
         sprintf(output_file, "%s-%d", file_dir, file_num);
 
         int rand_num = -1; // END seqNum should be the same as START;
+
+        // Reset receive window
+        for (int i = 0; i < window_size; i++) {
+            status[i] = 0;
+        }
+        window_start = 0;
 
         bool completed = false;
         while (!completed) {
@@ -124,8 +145,6 @@ int main(int argc, char *argv[]) {
 
             bzero(chunk, MAX_PACKET_LEN);
             size_t chunk_len = parse_chunk(buffer, chunk);
-            printf("%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
-                   packet_header.checksum);
 
             if (crc32(chunk, chunk_len) != packet_header.checksum) {
                 printf("Checksum incorrect\n");
@@ -164,9 +183,35 @@ int main(int argc, char *argv[]) {
                         printf("No START received\n");
                         should_continue = true;
                     } else {
-                        size_t chunk_len = parse_chunk(buffer, chunk);
-                        fwrite_nth_chunk(chunk, packet_header.seqNum, chunk_len, fileptr);
-                        seqNum = 3;
+                        if (packet_header.seqNum < window_start) {
+                            seqNum = packet_header.seqNum;
+                        } else if (packet_header.seqNum > window_start) {
+                            seqNum = window_start;
+                            if (packet_header.seqNum < window_start + window_size) {
+                                if (status[packet_header.seqNum - window_start] == 0) {
+                                    status[packet_header.seqNum - window_start] = 1;
+                                    fwrite_nth_chunk(chunk, packet_header.seqNum, chunk_len, fileptr);
+                                }
+                            }
+                        } else {
+                            // packet_header.seqNum == window_start
+                            if (status[0] == 0) {
+                                status[0] = 1;
+                                fwrite_nth_chunk(chunk, packet_header.seqNum, chunk_len, fileptr);
+                            }
+
+                            int shift_by = 0;
+                            for (int i = 0; i < window_size; i++) {
+                                if (status[i] == 1) {
+                                    shift_by++;
+                                } else {
+                                    break;
+                                }
+                            }
+                            window_start += shift_by;
+                            seqNum = window_start;
+                            left_shift_array(status, window_size, shift_by);
+                        }
                     }
                     break;
                 default:
