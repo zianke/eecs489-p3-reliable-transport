@@ -54,6 +54,18 @@ size_t fread_nth_chunk(char *chunk, int n, long file_len, FILE *fileptr) {
     return chunk_len;
 }
 
+void left_shift_array(int *array, int num_elements, int shift_by) {
+    assert(num_elements > 0);
+    assert(shift_by > 0);
+    assert(shift_by <= num_elements);
+
+    memmove(&array[0], &array[shift_by], (num_elements - shift_by) * sizeof(int));
+
+    for (int i = num_elements - shift_by; i < num_elements; i++) {
+        array[i] = 0;
+    }
+}
+
 int min(int a, int b) {
     return a < b ? a : b;
 }
@@ -137,7 +149,7 @@ int main(int argc, char *argv[]) {
 
         struct PacketHeader packet_header = parse_packet_header(buffer);
         fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
-               packet_header.checksum);
+                packet_header.checksum);
         fflush(log_fileptr);
 
         if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
@@ -146,8 +158,9 @@ int main(int argc, char *argv[]) {
         }
 
         struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
-               ack_packet_header.checksum);
+        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
+                ack_packet_header.length,
+                ack_packet_header.checksum);
         fflush(log_fileptr);
 
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
@@ -157,18 +170,18 @@ int main(int argc, char *argv[]) {
 
     // Sending chunks
     int num_chunks = (int) ceil((double) file_len / (double) (MAX_PACKET_LEN - sizeof(struct PacketHeader)));
-    int status[num_chunks]; // -1: not sent, 0: sent not acked, 1: acked
-    for (int i = 0; i < num_chunks; i++) {
+    int status[window_size]; // -1: not sent, 0: sent not acked, 1: acked
+    for (int i = 0; i < window_size; i++) {
         status[i] = -1;
     }
 
     int window_start = 0;
     bool resend_all = false;
     while (window_start != num_chunks) {
-        for (int i = window_start; i < min(window_start + window_size, num_chunks); i++) {
+        for (int i = 0; i < min(window_size, num_chunks - window_start); i++) {
             if (status[i] == -1 || (resend_all && status[i] == 0)) {
-                chunk_len = fread_nth_chunk(chunk, i, file_len, fileptr);
-                packet_len = assemble_packet(buffer, 2, i, chunk_len, chunk);
+                chunk_len = fread_nth_chunk(chunk, i + window_start, file_len, fileptr);
+                packet_len = assemble_packet(buffer, 2, i + window_start, chunk_len, chunk);
                 if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
                                        (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
                     perror("sendto");
@@ -178,7 +191,7 @@ int main(int argc, char *argv[]) {
 
                 struct PacketHeader packet_header = parse_packet_header(buffer);
                 fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
-                       packet_header.checksum);
+                        packet_header.checksum);
                 fflush(log_fileptr);
             }
         }
@@ -192,11 +205,13 @@ int main(int argc, char *argv[]) {
         resend_all = false;
 
         struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
-               ack_packet_header.checksum);
+        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
+                ack_packet_header.length,
+                ack_packet_header.checksum);
         fflush(log_fileptr);
 
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum > window_start) {
+            left_shift_array(status, window_size, ack_packet_header.seqNum - window_start);
             window_start = ack_packet_header.seqNum;
         }
     }
@@ -216,7 +231,7 @@ int main(int argc, char *argv[]) {
 
         struct PacketHeader packet_header = parse_packet_header(buffer);
         fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
-               packet_header.checksum);
+                packet_header.checksum);
         fflush(log_fileptr);
 
         if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
@@ -225,8 +240,9 @@ int main(int argc, char *argv[]) {
         }
 
         struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
-               ack_packet_header.checksum);
+        fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
+                ack_packet_header.length,
+                ack_packet_header.checksum);
         fflush(log_fileptr);
 
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum == rand_num) {
