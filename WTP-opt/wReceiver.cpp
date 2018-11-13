@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
             bool should_continue = false;
             switch (packet_header.type) {
                 case 0:
-                    if (rand_num != -1) {
+                    if (rand_num != -1 && rand_num != packet_header.seqNum) {
                         printf("Duplicate START\n");
                         should_continue = true;
                     } else {
@@ -252,17 +252,27 @@ int main(int argc, char *argv[]) {
             assert(seqNum >= 0);
             size_t ACK_packet_len = assemble_packet(ACK_buffer, 3, seqNum, 0, empty_chunk);
 
-            if ((numbytes = sendto(sockfd, ACK_buffer, ACK_packet_len, 0,
-                                   (struct sockaddr *) &ACK_addr, sizeof(struct sockaddr))) == -1) {
-                perror("sendto");
-                exit(1);
-            }
 
-            struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-            fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
-                    ack_packet_header.length,
-                    ack_packet_header.checksum);
-            fflush(log_fileptr);
+//            int r = rand() % 20;
+//            if (r > 15) {
+
+
+                if ((numbytes = sendto(sockfd, ACK_buffer, ACK_packet_len, 0,
+                                       (struct sockaddr *) &ACK_addr, sizeof(struct sockaddr))) == -1) {
+                    perror("sendto");
+                    exit(1);
+                }
+
+                struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+                fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
+                        ack_packet_header.length,
+                        ack_packet_header.checksum);
+                fflush(log_fileptr);
+
+
+//            }
+
+
         }
 
         fclose(fileptr);

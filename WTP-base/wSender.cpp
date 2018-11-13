@@ -56,8 +56,12 @@ size_t fread_nth_chunk(char *chunk, int n, long file_len, FILE *fileptr) {
 
 void left_shift_array(int *array, int num_elements, int shift_by) {
     assert(num_elements > 0);
-    assert(shift_by > 0);
+    assert(shift_by >= 0);
     assert(shift_by <= num_elements);
+
+    if (shift_by == 0) {
+        return;
+    }
 
     memmove(&array[0], &array[shift_by], (num_elements - shift_by) * sizeof(int));
 

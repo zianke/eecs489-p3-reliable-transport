@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
 
             struct PacketHeader packet_header = parse_packet_header(buffer);
             fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
-                   packet_header.checksum);
+                    packet_header.checksum);
             fflush(log_fileptr);
 
             bzero(chunk, MAX_PACKET_LEN);
@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
             bool should_continue = false;
             switch (packet_header.type) {
                 case 0:
-                    if (rand_num != -1) {
+                    if (rand_num != -1 && rand_num != packet_header.seqNum) {
                         printf("Duplicate START\n");
                         should_continue = true;
                     } else {
@@ -257,8 +257,9 @@ int main(int argc, char *argv[]) {
             }
 
             struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-            fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
-                   ack_packet_header.checksum);
+            fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
+                    ack_packet_header.length,
+                    ack_packet_header.checksum);
             fflush(log_fileptr);
         }
 
