@@ -204,19 +204,31 @@ int main(int argc, char *argv[]) {
                 case -1: {
                     chunk_len = fread_nth_chunk(chunk, i + window_start, file_len, fileptr);
                     packet_len = assemble_packet(buffer, 2, i + window_start, chunk_len, chunk);
-                    if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
-                                           (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
-                        perror("sendto");
-                        exit(1);
-                    }
-                    status[i] = 0;
-                    gettimeofday(&send_time[i], NULL);
+
+
+//                    int r = rand() % 20;
+//                    if (r > 5) {
+
+
+                        if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
+                                               (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
+                            perror("sendto");
+                            exit(1);
+                        }
+
+
+//                    }
+
 
                     struct PacketHeader packet_header = parse_packet_header(buffer);
                     fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum,
                             packet_header.length,
                             packet_header.checksum);
                     fflush(log_fileptr);
+
+                    status[i] = 0;
+                    gettimeofday(&send_time[i], NULL);
+
                     break;
                 }
                 case 0: {
@@ -228,19 +240,29 @@ int main(int argc, char *argv[]) {
                     if (duration > 500) {
                         chunk_len = fread_nth_chunk(chunk, i + window_start, file_len, fileptr);
                         packet_len = assemble_packet(buffer, 2, i + window_start, chunk_len, chunk);
-                        if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
-                                               (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
-                            perror("sendto");
-                            exit(1);
-                        }
-                        status[i] = 0;
-                        gettimeofday(&send_time[i], NULL);
+
+
+//                        int r = rand() % 20;
+//                        if (r > 5) {
+
+
+                            if ((numbytes = sendto(sockfd, buffer, packet_len, 0,
+                                                   (struct sockaddr *) &recv_addr, sizeof(struct sockaddr))) == -1) {
+                                perror("sendto");
+                                exit(1);
+                            }
+
+//                        }
+
 
                         struct PacketHeader packet_header = parse_packet_header(buffer);
                         fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum,
                                 packet_header.length,
                                 packet_header.checksum);
                         fflush(log_fileptr);
+
+                        status[i] = 0;
+                        gettimeofday(&send_time[i], NULL);
                     }
                     break;
                 }
