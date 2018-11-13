@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
         char chunk[MAX_PACKET_LEN];
         bzero(chunk, MAX_PACKET_LEN);
         char output_file[strlen(file_dir) + 10];
-        sprintf(output_file, "%s-%d", file_dir, file_num);
+        sprintf(output_file, "%s/FILE-%d", file_dir, file_num);
 
         int rand_num = -1; // END seqNum should be the same as START;
 
