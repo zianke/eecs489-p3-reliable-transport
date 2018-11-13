@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
 
 
 //            int r = rand() % 20;
-//            if (r > 15) {
+//            if (r > 10) {
 
 
                 if ((numbytes = sendto(sockfd, ACK_buffer, ACK_packet_len, 0,
@@ -263,16 +263,13 @@ int main(int argc, char *argv[]) {
                     exit(1);
                 }
 
-                struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-                fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
-                        ack_packet_header.length,
-                        ack_packet_header.checksum);
-                fflush(log_fileptr);
-
-
 //            }
 
-
+            struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
+            fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
+                    ack_packet_header.length,
+                    ack_packet_header.checksum);
+            fflush(log_fileptr);
         }
 
         fclose(fileptr);
