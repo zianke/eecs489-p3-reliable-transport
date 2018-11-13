@@ -180,7 +180,8 @@ int main(int argc, char *argv[]) {
     }
 
     int window_start = 0;
-    bool resend_all = false;
+    bool resend_all = true;
+    struct timeval start_time;
     while (window_start != num_chunks) {
         for (int i = 0; i < min(window_size, num_chunks - window_start); i++) {
             if (status[i] == -1 || (resend_all && status[i] == 0)) {
@@ -200,6 +201,10 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        if (resend_all) {
+            gettimeofday(&start_time, NULL);
+        }
+
         if ((numbytes = recvfrom(sockfd, ACK_buffer, MAX_BUFFER_LEN - 1, 0,
                                  (struct sockaddr *) &ACK_addr, (socklen_t *) &addr_len)) == -1) {
             resend_all = true;
@@ -217,6 +222,17 @@ int main(int argc, char *argv[]) {
         if (ack_packet_header.type == 3 && ack_packet_header.seqNum > window_start) {
             left_shift_array(status, window_size, ack_packet_header.seqNum - window_start);
             window_start = ack_packet_header.seqNum;
+            // reset the timer
+            gettimeofday(&start_time, NULL);
+            continue;
+        }
+        
+        struct timeval cur_time;
+        gettimeofday(&cur_time, NULL);
+        double duration = (cur_time.tv_sec - start_time.tv_sec) * 1000.0 +
+                            (cur_time.tv_usec - start_time.tv_usec) / 1000.0;
+        if (duration > 500) {
+            resend_all = true;
         }
     }
 
