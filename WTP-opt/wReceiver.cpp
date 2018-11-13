@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
 
             struct PacketHeader packet_header = parse_packet_header(buffer);
             fprintf(log_fileptr, "%u %u %u %u\n", packet_header.type, packet_header.seqNum, packet_header.length,
-                   packet_header.checksum);
+                    packet_header.checksum);
             fflush(log_fileptr);
 
             bzero(chunk, MAX_PACKET_LEN);
@@ -190,15 +190,18 @@ int main(int argc, char *argv[]) {
                         if (packet_header.seqNum < window_start) {
                             seqNum = packet_header.seqNum;
                         } else if (packet_header.seqNum > window_start) {
-                            seqNum = window_start;
                             if (packet_header.seqNum < window_start + window_size) {
+                                seqNum = packet_header.seqNum;
                                 if (status[packet_header.seqNum - window_start] == 0) {
                                     status[packet_header.seqNum - window_start] = 1;
                                     fwrite_nth_chunk(chunk, packet_header.seqNum, chunk_len, fileptr);
                                 }
+                            } else {
+                                should_continue = true;
                             }
                         } else {
                             // packet_header.seqNum == window_start
+                            seqNum = packet_header.seqNum;
                             if (status[0] == 0) {
                                 status[0] = 1;
                                 fwrite_nth_chunk(chunk, packet_header.seqNum, chunk_len, fileptr);
@@ -213,7 +216,6 @@ int main(int argc, char *argv[]) {
                                 }
                             }
                             window_start += shift_by;
-                            seqNum = window_start;
                             left_shift_array(status, window_size, shift_by);
                         }
                     }
@@ -257,8 +259,9 @@ int main(int argc, char *argv[]) {
             }
 
             struct PacketHeader ack_packet_header = parse_packet_header(ACK_buffer);
-            fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum, ack_packet_header.length,
-                   ack_packet_header.checksum);
+            fprintf(log_fileptr, "%u %u %u %u\n", ack_packet_header.type, ack_packet_header.seqNum,
+                    ack_packet_header.length,
+                    ack_packet_header.checksum);
             fflush(log_fileptr);
         }
 
