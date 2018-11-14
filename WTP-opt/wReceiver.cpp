@@ -67,7 +67,7 @@ void left_shift_array(int *array, int num_elements, int shift_by) {
     memmove(&array[0], &array[shift_by], (num_elements - shift_by) * sizeof(int));
 
     for (int i = num_elements - shift_by; i < num_elements; i++) {
-        array[i] = -1;
+        array[i] = 0;
     }
 }
 
