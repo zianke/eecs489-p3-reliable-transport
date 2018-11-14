@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
                         should_continue = true;
                     } else {
                         if (packet_header.seqNum < window_start) {
-                            seqNum = packet_header.seqNum;
+                            seqNum = window_start;
                         } else if (packet_header.seqNum > window_start) {
                             seqNum = window_start;
                             if (packet_header.seqNum < window_start + window_size) {
